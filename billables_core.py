@@ -257,6 +257,15 @@ def consolidate_workbook(wb):
         for prop, date_val, desc, amt in _read_entries_from_week_sheet(wb[name]):
             all_entries.append((name, prop, date_val, desc, amt))
 
+    def sort_key(entry):
+        _, prop, date_val, _, _ = entry
+        prop_key = (prop or '').strip().lower()
+        # dates are normally real datetime objects; fall back gracefully if not
+        date_key = date_val if hasattr(date_val, 'toordinal') else datetime.min
+        return (prop_key, date_key)
+
+    all_entries.sort(key=sort_key)
+
     if 'Consolidated' in wb.sheetnames:
         del wb['Consolidated']
     cons_ws = wb.create_sheet('Consolidated', 0)
