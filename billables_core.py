@@ -269,7 +269,8 @@ def consolidate_workbook(wb):
     if 'Consolidated' in wb.sheetnames:
         del wb['Consolidated']
     cons_ws = wb.create_sheet('Consolidated', 0)
-    _write_entries_sheet(cons_ws, all_entries, include_week_col=True)
+    plain_entries = [(prop, date_val, desc, amt) for _, prop, date_val, desc, amt in all_entries]
+    _write_entries_sheet(cons_ws, plain_entries, include_week_col=False)
 
     # ---- Summary by property (SUMIF against the Consolidated tab) ----
     properties = []
@@ -289,7 +290,7 @@ def consolidate_workbook(wb):
     r = 2
     for prop in properties:
         sum_ws.cell(row=r, column=1, value=prop).font = BODY_FONT
-        formula = f'=SUMIF(Consolidated!B:B,A{r},Consolidated!E:E)'
+        formula = f'=SUMIF(Consolidated!A:A,A{r},Consolidated!D:D)'
         amt_cell = sum_ws.cell(row=r, column=2, value=formula)
         amt_cell.font = BODY_FONT
         amt_cell.number_format = '$#,##0.00'
