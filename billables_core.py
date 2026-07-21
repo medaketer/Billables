@@ -18,7 +18,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, Alignment
 from openpyxl.utils import get_column_letter
 
-DATE_RE = re.compile(r'^(\d{2}/\d{2}/\d{2})\s+(.*)$', re.S)
+DATE_RE = re.compile(r'^(\d{1,2}\s*/\s*\d{1,2}\s*/\s*\d{2,4})\s+(.*)$', re.S)
 AMOUNT_RE = re.compile(r'\$[\d,]+\.\d{2}')
 WEEK_SHEET_RE = re.compile(r'^Week\s*(\d+)$', re.IGNORECASE)
 
@@ -70,6 +70,12 @@ def _entry_from_line(text):
     if not m:
         return None
     date_str, rest = m.groups()
+    date_str = re.sub(r'\s+', '', date_str)  # "7/16/ 26" -> "7/16/26"
+    try:
+        date_val = datetime.strptime(date_str, '%m/%d/%y')
+    except ValueError:
+        date_val = date_str
+
     rest = rest.strip()
     matches = list(AMOUNT_RE.finditer(rest))
     if not matches:
@@ -269,8 +275,7 @@ def consolidate_workbook(wb):
     if 'Consolidated' in wb.sheetnames:
         del wb['Consolidated']
     cons_ws = wb.create_sheet('Consolidated', 0)
-    plain_entries = [(prop, date_val, desc, amt) for _, prop, date_val, desc, amt in all_entries]
-    _write_entries_sheet(cons_ws, plain_entries, include_week_col=False)
+    _write_entries_sheet(cons_ws, all_entries, include_week_col=True)
 
     # ---- Summary by property (SUMIF against the Consolidated tab) ----
     properties = []
@@ -290,7 +295,7 @@ def consolidate_workbook(wb):
     r = 2
     for prop in properties:
         sum_ws.cell(row=r, column=1, value=prop).font = BODY_FONT
-        formula = f'=SUMIF(Consolidated!A:A,A{r},Consolidated!D:D)'
+        formula = f'=SUMIF(Consolidated!B:B,A{r},Consolidated!E:E)'
         amt_cell = sum_ws.cell(row=r, column=2, value=formula)
         amt_cell.font = BODY_FONT
         amt_cell.number_format = '$#,##0.00'
