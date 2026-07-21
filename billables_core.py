@@ -93,12 +93,16 @@ def _entry_from_line(text):
     return date_val, description, amount_val
 
 
+def _paragraph_is_all_bold(paragraph):
+    """True if every run with visible text in this paragraph is bold
+    (used to detect technician-name / title lines like '**Alex**')."""
+    runs_with_text = [r for r in paragraph.runs if r.text and r.text.strip()]
+    if not runs_with_text:
+        return False
+    return all(r.bold for r in runs_with_text)
+
+
 def parse_billables_docx(file_obj):
-    """
-    Parse a weekly Billables .docx file.
-    Returns a list of (property_name, date, description, amount) tuples,
-    in the same order they appear in the document.
-    """
     doc = Document(file_obj)
     entries = []
 
@@ -118,6 +122,7 @@ def parse_billables_docx(file_obj):
 
     for paragraph in all_paragraphs():
         hl_text, other_text = _paragraph_highlighted_and_other_text(paragraph)
+        is_bold_para = _paragraph_is_all_bold(paragraph)
 
         if hl_text:
             if not in_property_block:
@@ -126,15 +131,26 @@ def parse_billables_docx(file_obj):
             property_buffer.append(hl_text)
 
         if other_text:
-            if in_property_block:
-                current_property = ' '.join(property_buffer).strip()
-                in_property_block = False
-
             parsed = _entry_from_line(other_text)
             if parsed:
+                if in_property_block:
+                    current_property = ' '.join(property_buffer).strip()
+                    in_property_block = False
                 date_val, description, amount_val = parsed
                 entries.append((current_property, date_val, description, amount_val))
-            # else: technician name / title line / other non-entry text -> ignore
+            elif not hl_text and not is_bold_para:
+                # plain (non-highlighted, non-bold) text that isn't an entry ->
+                # treat it as a property label, same as the highlighted ones
+                if not in_property_block:
+                    property_buffer = []
+                    in_property_block = True
+                property_buffer.append(other_text)
+            else:
+                # bold technician-name / title line -> ignore, but close out
+                # any property label that was in progress
+                if in_property_block:
+                    current_property = ' '.join(property_buffer).strip()
+                    in_property_block = False
 
     return entries
 
