@@ -64,6 +64,17 @@ def _paragraph_highlighted_and_other_text(paragraph):
     return clean(highlighted_parts), clean(other_parts)
 
 
+def _parse_date(date_str):
+    """Parse a date string trying 2-digit-year then 4-digit-year formats.
+    Falls back to the raw string (unchanged) if neither matches."""
+    for fmt in ('%m/%d/%y', '%m/%d/%Y'):
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+    return date_str
+
+
 def _entry_from_line(text):
     """If a line is a billable entry (starts with a date), parse it. Else None."""
     m = DATE_RE.match(text.strip())
@@ -71,10 +82,7 @@ def _entry_from_line(text):
         return None
     date_str, rest = m.groups()
     date_str = re.sub(r'\s+', '', date_str)  # "7/16/ 26" -> "7/16/26"
-    try:
-        date_val = datetime.strptime(date_str, '%m/%d/%y')
-    except ValueError:
-        date_val = date_str
+    date_val = _parse_date(date_str)
 
     rest = rest.strip()
     matches = list(AMOUNT_RE.finditer(rest))
@@ -85,10 +93,6 @@ def _entry_from_line(text):
     description = (rest[:last.start()] + rest[last.end():]).strip()
     # tidy up stray punctuation/space left behind where the amount was removed
     description = re.sub(r'\s{2,}', ' ', description).strip()
-    try:
-        date_val = datetime.strptime(date_str, '%m/%d/%y')
-    except ValueError:
-        date_val = date_str
     amount_val = float(amount_str.replace('$', '').replace(',', ''))
     return date_val, description, amount_val
 
